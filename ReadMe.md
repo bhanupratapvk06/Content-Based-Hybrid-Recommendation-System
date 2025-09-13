@@ -107,7 +107,6 @@ Enter a movie or anime title to get **cross-recommendations** 🎉
 ## 📊 Example
 - Input: *Your Name* (Anime)
 - Output: Recommendations of **movies** with similar genres/themes/ratings.  
-(Screenshot section can be added here)
 
 ---
 
@@ -126,4 +125,4 @@ Feel free to fork, submit issues, or open a pull request.
 ---
 
 ## 📜 License
-MIT License © 2025 Your Name
+MIT License © 2025 Bhanu Pratap Singh
