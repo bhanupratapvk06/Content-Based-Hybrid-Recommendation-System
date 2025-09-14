@@ -8,3 +8,4 @@ dill
 spacy
 faiss-cpu
 openpyxl
+gdown

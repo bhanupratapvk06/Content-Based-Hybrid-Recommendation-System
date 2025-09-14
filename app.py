@@ -1,3 +1,5 @@
+import os
+import gdown
 import dill
 import faiss
 import pickle
@@ -11,6 +13,16 @@ import streamlit as st
 # -------------------------------
 # Load objects
 # -------------------------------
+
+
+model_path = "model.pkl"
+if not os.path.exists(model_path):
+    url = "https://drive.google.com/uc?id=YOUR_FILE_ID"
+    print("Downloading model...")
+    gdown.download(url, model_path, quiet=False)
+    print("Download complete.")
+
+
 combined_data = pickle.load(open("models/combined_data.pkl", "rb"))
 vectorizer = pickle.load(open("models/vectorizer.pkl", "rb"))
 genre_vectorizer = dill.load(open("models/genre_vectorizer.pkl", "rb")) 
