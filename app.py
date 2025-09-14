@@ -14,6 +14,15 @@ import streamlit as st
 # Load objects
 # -------------------------------
 
+import os
+import pickle
+import dill
+import gdown
+import faiss
+
+MODEL_DIR = "models"
+os.makedirs(MODEL_DIR, exist_ok=True)
+
 files_to_download = {
     "combined_data.pkl": "1OyQ06oHzk9U0yfz0erE6Cu0zsas2d6Aw",
     "vectorizer.pkl": "13_Ehl9cxh_qfmfKZh6ICDgvxeCPYaw7e",
@@ -23,25 +32,21 @@ files_to_download = {
     "faiss.index": "19tKAFzrz1DRWxTLC-o1AGFiUL5JN8LvP"
 }
 
-os.makedirs("models", exist_ok=True)
-
 for filename, file_id in files_to_download.items():
-    path = os.path.join("models", filename)
-    if not os.path.exists(path):
+    path = os.path.join(MODEL_DIR, filename)
+    if not os.path.exists(path) or os.path.getsize(path) == 0:
         url = f"https://drive.google.com/uc?id={file_id}"
         print(f"Downloading {filename}...")
         gdown.download(url, path, quiet=False)
-        if os.path.exists(path):
-            print(f"{filename} downloaded successfully.")
-        else:
-            print(f"Failed to download {filename}. Check file ID or permissions.")
+    else:
+        print(f"{filename} already exists, skipping download.")
 
-combined_data = pickle.load(open("models/combined_data.pkl", "rb"))
-vectorizer = pickle.load(open("models/vectorizer.pkl", "rb"))
-genre_vectorizer = dill.load(open("models/genre_vectorizer.pkl", "rb")) 
-reduced_matrix = dill.load(open("models/reduced_matrix.pkl", "rb")) 
-svd = pickle.load(open("models/svd.pkl", "rb"))
-index = faiss.read_index("models/faiss.index")
+combined_data = pickle.load(open(os.path.join(MODEL_DIR, "combined_data.pkl"), "rb"))
+vectorizer = pickle.load(open(os.path.join(MODEL_DIR, "vectorizer.pkl"), "rb"))
+genre_vectorizer = dill.load(open(os.path.join(MODEL_DIR, "genre_vectorizer.pkl"), "rb"))
+reduced_matrix = dill.load(open(os.path.join(MODEL_DIR, "reduced_matrix.pkl"), "rb"))
+svd = pickle.load(open(os.path.join(MODEL_DIR, "svd.pkl"), "rb"))
+index = faiss.read_index(os.path.join(MODEL_DIR, "faiss.index"))
 
 # -------------------------------
 # Explainability helpers
