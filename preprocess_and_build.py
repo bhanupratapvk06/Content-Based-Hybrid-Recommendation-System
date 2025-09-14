@@ -13,6 +13,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.decomposition import TruncatedSVD
 from sklearn.preprocessing import MinMaxScaler
 
+
 nltk.download('stopwords')
 nltk.download('wordnet')
 

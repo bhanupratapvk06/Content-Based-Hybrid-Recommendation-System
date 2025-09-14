@@ -11,42 +11,69 @@ from sklearn.metrics.pairwise import cosine_similarity
 import streamlit as st
 
 # -------------------------------
-# Load objects
+# Setup model directory
 # -------------------------------
-
-import os
-import pickle
-import dill
-import gdown
-import faiss
-
 MODEL_DIR = "models"
 os.makedirs(MODEL_DIR, exist_ok=True)
 
+# -------------------------------
+# Model files and Google Drive IDs
+# -------------------------------
 files_to_download = {
-    "combined_data.pkl": "1OyQ06oHzk9U0yfz0erE6Cu0zsas2d6Aw",
-    "vectorizer.pkl": "13_Ehl9cxh_qfmfKZh6ICDgvxeCPYaw7e",
-    "genre_vectorizer.pkl": "1IJ-9J8bB5kNZCiUELgdVCcQ_6VRFoKcL",
-    "reduced_matrix.pkl": "16ZkoJdiFBzvAFOkAZPyjYdT2eGG8OmOR",
-    "svd.pkl": "1jc3G5u0MYkJJNDcUxHmSWlv1QeXxKQCj",
-    "faiss.index": "19tKAFzrz1DRWxTLC-o1AGFiUL5JN8LvP"
+    "combined_data.pkl": "1odp6rHp4R3fgIVKl8REK_kVcbrP0We51",
+    "vectorizer.pkl": "1ngxRoIJ40Srnq0F2elNiB3ATwHoD2jL6",
+    "genre_vectorizer.pkl": "1EM1RwPRX4obB1tSc_Fd0sJtvjnwb8qJd",
+    "reduced_matrix.pkl": "1c1A26pb47WIKpxuOz-vrOMsN1OPgvuLy",
+    "svd.pkl": "14MhVhKdEaPg5qOXhl_LyAOfGLTYEci0u",
+    "faiss.index": "1JEGTS31JLXc_SEXyiW8svOH61pYv5hyH"
 }
 
+
+# -------------------------------
+# Download missing files
+# -------------------------------
+st.write("Checking model files...")
 for filename, file_id in files_to_download.items():
     path = os.path.join(MODEL_DIR, filename)
     if not os.path.exists(path) or os.path.getsize(path) == 0:
         url = f"https://drive.google.com/uc?id={file_id}"
-        print(f"Downloading {filename}...")
+        st.write(f"Downloading {filename}...")
         gdown.download(url, path, quiet=False)
     else:
-        print(f"{filename} already exists, skipping download.")
+        st.write(f"{filename} already exists, skipping download.")
 
-combined_data = pickle.load(open(os.path.join(MODEL_DIR, "combined_data.pkl"), "rb"))
-vectorizer = pickle.load(open(os.path.join(MODEL_DIR, "vectorizer.pkl"), "rb"))
-genre_vectorizer = dill.load(open(os.path.join(MODEL_DIR, "genre_vectorizer.pkl"), "rb"))
-reduced_matrix = dill.load(open(os.path.join(MODEL_DIR, "reduced_matrix.pkl"), "rb"))
-svd = pickle.load(open(os.path.join(MODEL_DIR, "svd.pkl"), "rb"))
-index = faiss.read_index(os.path.join(MODEL_DIR, "faiss.index"))
+# -------------------------------
+# Load objects safely
+# -------------------------------
+st.write("Loading models...")
+
+with open(os.path.join(MODEL_DIR, "combined_data.pkl"), "rb") as f:
+    combined_data = pickle.load(f)
+
+with open(os.path.join(MODEL_DIR, "vectorizer.pkl"), "rb") as f:
+    vectorizer = pickle.load(f)
+
+with open(os.path.join(MODEL_DIR, "genre_vectorizer.pkl"), "rb") as f:
+    genre_vectorizer = dill.load(f)
+
+with open(os.path.join(MODEL_DIR, "reduced_matrix.pkl"), "rb") as f:
+    reduced_matrix = dill.load(f)
+
+with open(os.path.join(MODEL_DIR, "svd.pkl"), "rb") as f:
+    svd = pickle.load(f)
+
+# -------------------------------
+# Load FAISS index with safety check
+# -------------------------------
+faiss_index_path = os.path.join(MODEL_DIR, "faiss.index")
+try:
+    index = faiss.read_index(faiss_index_path)
+    st.write("FAISS index loaded successfully.")
+except Exception as e:
+    st.error(f"Error loading FAISS index: {e}")
+    index = None
+
+st.success("All models loaded successfully!")
 
 # -------------------------------
 # Explainability helpers
