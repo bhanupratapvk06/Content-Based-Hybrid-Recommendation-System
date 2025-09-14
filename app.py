@@ -8,7 +8,7 @@ import pandas as pd
 from scipy import sparse
 from scipy.sparse import hstack
 from sklearn.metrics.pairwise import cosine_similarity
-import streamlit as st
+import gradio as gr
 
 # -------------------------------
 # Setup model directory
@@ -28,25 +28,14 @@ files_to_download = {
     "faiss.index": "1JEGTS31JLXc_SEXyiW8svOH61pYv5hyH"
 }
 
-
-# -------------------------------
 # Download missing files
-# -------------------------------
-st.write("Checking model files...")
 for filename, file_id in files_to_download.items():
     path = os.path.join(MODEL_DIR, filename)
     if not os.path.exists(path) or os.path.getsize(path) == 0:
         url = f"https://drive.google.com/uc?id={file_id}"
-        st.write(f"Downloading {filename}...")
         gdown.download(url, path, quiet=False)
-    else:
-        st.write(f"{filename} already exists, skipping download.")
 
-# -------------------------------
-# Load objects safely
-# -------------------------------
-st.write("Loading models...")
-
+# Load models
 with open(os.path.join(MODEL_DIR, "combined_data.pkl"), "rb") as f:
     combined_data = pickle.load(f)
 
@@ -63,38 +52,20 @@ with open(os.path.join(MODEL_DIR, "reduced_matrix.pkl"), "rb") as f:
 with open(os.path.join(MODEL_DIR, "svd.pkl"), "rb") as f:
     svd = pickle.load(f)
 
-# -------------------------------
-# Load FAISS index with safety check
-# -------------------------------
 faiss_index_path = os.path.join(MODEL_DIR, "faiss.index")
-try:
-    index = faiss.read_index(faiss_index_path)
-    st.write("FAISS index loaded successfully.")
-except Exception as e:
-    st.error(f"Error loading FAISS index: {e}")
-    index = None
-
-st.success("All models loaded successfully!")
+index = faiss.read_index(faiss_index_path)
 
 # -------------------------------
-# Explainability helpers
+# Helper functions
 # -------------------------------
 def get_shared_genres(idx1, idx2):
     g1 = set(combined_data.loc[idx1, 'cleaned_genres'].split(','))
     g2 = set(combined_data.loc[idx2, 'cleaned_genres'].split(','))
     return g1.intersection(g2)
 
-def build_feature_vector(idx, combined_data, genre_vectorizer, vectorizer):
-    g_vec = genre_vectorizer.transform([combined_data.loc[idx, "cleaned_genres"]])
-    d_vec = vectorizer.transform([combined_data.loc[idx, "cleaned_description"]])
-    r_vec = sparse.csr_matrix([[combined_data.loc[idx, "rating"]]])
-    return hstack([g_vec, d_vec, r_vec])
-
 def maximal_marginal_relevance(query_vec, candidate_vecs, candidate_indices, top_n=10, diversity=0.5):
     sim_to_query = cosine_similarity(candidate_vecs, query_vec.reshape(1, -1))
-    
     sim_between = cosine_similarity(candidate_vecs)
-    
     selected = []
     while len(selected) < top_n and len(selected) < len(candidate_indices):
         if not selected:
@@ -106,15 +77,12 @@ def maximal_marginal_relevance(query_vec, candidate_vecs, candidate_indices, top
             for i in remaining:
                 relevance = sim_to_query[i]
                 diversity_penalty = max(sim_between[i][j] for j in selected)
-                mmr_score = diversity * relevance - (1 - diversity) * diversity_penalty
-                mmr_scores.append(mmr_score)
+                mmr_scores.append(diversity * relevance - (1 - diversity) * diversity_penalty)
             idx = remaining[np.argmax(mmr_scores)]
             selected.append(idx)
-    
     return [candidate_indices[i] for i in selected]
 
-
-def find_cross_recommendations(title, n=20, diversity=0.6):
+def find_cross_recommendations(title, n=12, diversity=0.6):
     found = combined_data[combined_data['title'].str.contains(title, case=False, regex=False)]
     if found.empty:
         return f"No matches for '{title}'"
@@ -122,23 +90,13 @@ def find_cross_recommendations(title, n=20, diversity=0.6):
     idx = found.index[0]
     input_type = combined_data.loc[idx, 'type']
     target_type = 'movie' if input_type == 'anime' else 'anime'
-    
-
     vec = reduced_matrix[idx].reshape(1, -1).astype('float32')
-    
-
     distances, indices = index.search(vec, 50)
-    
-
     candidate_indices = [i for i in indices[0][1:] if combined_data.loc[i, 'type'] == target_type]
     if not candidate_indices:
         return f"No recommendations found for '{title}' in target type '{target_type}'"
-    
     candidate_vecs = reduced_matrix[candidate_indices].astype('float32')
-    
-
     diverse_indices = maximal_marginal_relevance(vec, candidate_vecs, candidate_indices, top_n=n, diversity=diversity)
-    
 
     recs = []
     for rec_idx in diverse_indices:
@@ -148,124 +106,126 @@ def find_cross_recommendations(title, n=20, diversity=0.6):
             explanation += f"Shares themes: {', '.join(shared_genres)}. "
         if abs(combined_data.loc[idx, 'rating'] - combined_data.loc[rec_idx, 'rating']) < 0.5:
             explanation += "Similar audience rating. "
-        
+        image_url = combined_data.loc[rec_idx, "img_url"]
+        if pd.isna(image_url) or not isinstance(image_url, str) or image_url.strip() == "":
+            image_url = "https://upload.wikimedia.org/wikipedia/commons/1/14/No_Image_Available.jpg"
         recs.append({
-            "title": combined_data.loc[rec_idx, "title"],
-            "rating": combined_data.loc[rec_idx, "rating"],
-            "description": combined_data.loc[rec_idx, "description"],
-            "genres": combined_data.loc[rec_idx, "genres"],
-            "image": combined_data.loc[rec_idx, "img_url"],
-            "similarity": float(cosine_similarity(vec, reduced_matrix[rec_idx].reshape(1, -1).astype('float32'))[0][0]),
-            "explanation": explanation.strip()
+            "Title": combined_data.loc[rec_idx, "title"],
+            "Rating": combined_data.loc[rec_idx, "rating"],
+            "Genres": combined_data.loc[rec_idx, "genres"],
+            "Description": combined_data.loc[rec_idx, "description"],
+            "Image": image_url,
+            "Explanation": explanation.strip(),
         })
-        if len(recs) >= n:
-            break
+    return recs
+
+# -------------------------------
+# Gradio interface
+# -------------------------------
+
+def recommend_gradio(title):
+    recs = find_cross_recommendations(title)
     
-    return pd.DataFrame(recs)
-
-
+    if isinstance(recs, str):
+        return recs
+    
+    html_output = ""
+    for rec in recs:
+        if not isinstance(rec, dict):
+            continue
+        
+        genre_html = ""
+        if rec.get("Genres"):
+            genres = [g.strip() for g in rec["Genres"].split(',')]
+            genre_html = " ".join([
+                f"<span class='genre-badge'>{g}</span>"
+                for g in genres
+            ])
+        
+        html_output += f"""
+        <div class="rec-card">
+            <img src="{rec.get('Image', '')}">
+            <div class="rec-content">
+                <h4>{rec.get('Title', 'Unknown')} — ⭐ {rec.get('Rating', 'N/A')}</h4>
+                <p>{genre_html}</p>
+                <p class="desc">{rec.get('Description', '')}</p>
+                <p class="explanation"><i>{rec.get('Explanation', '')}</i></p>
+            </div>
+        </div>
+        """
+    return html_output or "<p style='color:#c9d1d9;'>No recommendations found.</p>"
 
 # -------------------------------
-# Streamlit
+# Launch Gradio Blocks UI
 # -------------------------------
 
-st.set_page_config(page_title="Anime & Movie Recommender", page_icon="🎬", layout="wide")
-
-
-st.markdown("""
+with gr.Blocks(theme=gr.themes.Soft()) as demo:
+    gr.HTML("""
     <style>
-    body {
+    #search-bar textarea {
+        width: 100% !important;
+        font-size: 1.2em !important;
+        padding: 12px !important;
+        border-radius: 12px !important;
+        background-color: #161b22 !important;
+        color: #c9d1d9 !important;
+        border: 1px solid #30363d !important;
+    }
+    .rec-card {
+        display: flex;
+        gap: 20px;
+        margin-bottom: 20px;
         background-color: #0d1117;
-        color: #c9d1d9;
+        padding: 15px;
+        border-radius: 15px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .rec-card img {
+        width: 150px;
+        height: 220px;
+        object-fit: cover;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+    .rec-content h4 {
+        color: #58a6ff;
+        margin-bottom: 6px;
         font-family: 'Segoe UI', sans-serif;
     }
-    .stButton>button {
+    .rec-content .desc {
+        color: #c9d1d9;
+        font-size: 0.95em;
+    }
+    .rec-content .explanation {
+        color: #8b949e;
+        font-size: 0.85em;
+    }
+    .genre-badge {
         background-color: #1f6feb;
         color: white;
-        font-weight: bold;
-        border-radius: 8px;
-        padding: 0.5em 1.5em;
-    }
-    .stTextInput>div>div>input {
-        border-radius: 8px;
-        border: 2px solid #1f6feb;
-        padding: 0.5em;
-        background-color: #161b22;
-        color: #c9d1d9;
-    }
-    .recommendation-card {
-        background-color: #161b22;
-        padding: 15px;
+        padding: 4px 10px;
         border-radius: 12px;
-        box-shadow: 0 4px 10px rgba(0,0,0,0.6);
-        margin-bottom: 15px;
-    }
-    h1, h3, p {
-        color: #c9d1d9;
-    }
-    .highlight {
-        color: #58a6ff;
-        font-weight: bold;
+        margin: 2px;
+        font-size: 0.85em;
     }
     </style>
-""", unsafe_allow_html=True)
+    """)
 
-# Header
-st.markdown(
-    "<h1 style='text-align:center; color:#58a6ff;'>🎬 Anime & Movie Recommendation System</h1>", 
-    unsafe_allow_html=True
-)
-st.markdown(
-    "<p style='text-align:center; color:#8b949e;'>Find similar movies and anime based on genres, ratings, and more ⚡</p>",
-    unsafe_allow_html=True
-)
+    gr.Markdown("<h1 style='color:#58a6ff; text-align:center;'>🎬 Anime & Movie Recommendation System</h1>")
+    gr.Markdown("<p style='color:#c9d1d9; text-align:center;'>Find similar movies and anime based on genres, ratings, and more ⚡</p>")
+    
+    search_input = gr.Textbox(
+        label="",
+        placeholder="Type a movie or anime title here...",
+        elem_id="search-bar",
+        show_label=False
+    )
+    search_button = gr.Button("Search", variant="primary")
+    
 
-# User input
-user_input = st.text_input("🔎 Enter a movie or anime title:")
+    output_html = gr.HTML()
+    
 
+    search_button.click(fn=recommend_gradio, inputs=search_input, outputs=output_html)
 
-if st.button("✨ Recommend"):
-    if user_input:
-        results = find_cross_recommendations(user_input, n=12)
-
-        if isinstance(results, str):
-            st.warning(results)
-        else:
-            st.markdown("## Top Recommendations")
-
-            num_columns = 1
-            for i in range(0, len(results), num_columns):
-                cols = st.columns(num_columns)
-                for j, col in enumerate(cols):
-                    if i + j < len(results):
-                        row = results.iloc[i + j]
-                        with col:
-                            image_url = row['image']
-                            if pd.isna(image_url) or not isinstance(image_url, str) or image_url.strip() == "":
-                                image_url = "https://upload.wikimedia.org/wikipedia/commons/1/14/No_Image_Available.jpg"
-
-                            genre_html = ""
-                            if row['genres']:
-                                genres = [g.strip() for g in row['genres'].split(',')]
-                                genre_html = " ".join([
-                                    f"<span style='background-color:#1f6feb; color:white; padding:3px 8px; border-radius:5px; margin:2px;'>{g}</span>"
-                                    for g in genres
-                                ])
-                            
-                            st.markdown(f"""
-                                <div class="recommendation-card" style="display:flex; align-items:flex-start; gap:20px;">
-                                    <div style="flex-shrink:0; width:200px; height:250px; overflow:hidden; border-radius:8px;">
-                                        <img src="{image_url}" style="width:100%; height:100%; object-fit:cover;">
-                                    </div>
-                                    <div style="flex-grow:1; text-align:left;">
-                                        <h4 class="highlight" style="margin-top:10px;">
-                                            {row['title']} 
-                                            <span style="color:#1f6feb">— Similarity: {row['similarity']:.2f}</span>
-                                        </h4>
-                                        <p>⭐ <strong>{row['rating']}</strong></p>
-                                        <p>{genre_html}</p>
-                                        <p>{row['description']}</p>
-                                    </div>
-                                </div>
-                            """, unsafe_allow_html=True)
-
+demo.launch()
