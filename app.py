@@ -13,25 +13,29 @@ import streamlit as st
 # -------------------------------
 # Load objects
 # -------------------------------
+
 files_to_download = {
-    "combined_data.pkl": "FILE_ID_1",
-    "vectorizer.pkl": "FILE_ID_2",
-    "genre_vectorizer.pkl": "FILE_ID_3",
-    "reduced_matrix.pkl": "FILE_ID_4",
-    "svd.pkl": "FILE_ID_5",
-    "faiss.index": "FILE_ID_6"
+    "combined_data.pkl": "1OyQ06oHzk9U0yfz0erE6Cu0zsas2d6Aw",
+    "vectorizer.pkl": "13_Ehl9cxh_qfmfKZh6ICDgvxeCPYaw7e",
+    "genre_vectorizer.pkl": "1IJ-9J8bB5kNZCiUELgdVCcQ_6VRFoKcL",
+    "reduced_matrix.pkl": "16ZkoJdiFBzvAFOkAZPyjYdT2eGG8OmOR",
+    "svd.pkl": "1jc3G5u0MYkJJNDcUxHmSWlv1QeXxKQCj",
+    "faiss.index": "19tKAFzrz1DRWxTLC-o1AGFiUL5JN8LvP"
 }
 
 os.makedirs("models", exist_ok=True)
 
 for filename, file_id in files_to_download.items():
-    path = f"models/{filename}"
+    path = os.path.join("models", filename)
     if not os.path.exists(path):
         url = f"https://drive.google.com/uc?id={file_id}"
         print(f"Downloading {filename}...")
         gdown.download(url, path, quiet=False)
-        print(f"{filename} downloaded.")
-        
+        if os.path.exists(path):
+            print(f"{filename} downloaded successfully.")
+        else:
+            print(f"Failed to download {filename}. Check file ID or permissions.")
+
 combined_data = pickle.load(open("models/combined_data.pkl", "rb"))
 vectorizer = pickle.load(open("models/vectorizer.pkl", "rb"))
 genre_vectorizer = dill.load(open("models/genre_vectorizer.pkl", "rb")) 
