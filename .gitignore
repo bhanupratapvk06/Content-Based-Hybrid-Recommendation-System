@@ -1,3 +1,9 @@
 Data/
+
+# Ignore .pkl and .index everywhere...
 *.pkl
 *.index
+
+# ...except in models/
+!models/*.pkl
+!models/*.index
