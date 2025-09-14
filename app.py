@@ -13,16 +13,25 @@ import streamlit as st
 # -------------------------------
 # Load objects
 # -------------------------------
+files_to_download = {
+    "combined_data.pkl": "FILE_ID_1",
+    "vectorizer.pkl": "FILE_ID_2",
+    "genre_vectorizer.pkl": "FILE_ID_3",
+    "reduced_matrix.pkl": "FILE_ID_4",
+    "svd.pkl": "FILE_ID_5",
+    "faiss.index": "FILE_ID_6"
+}
 
+os.makedirs("models", exist_ok=True)
 
-model_path = "model.pkl"
-if not os.path.exists(model_path):
-    url = "https://drive.google.com/drive/folders/1NYqJKpY31jWPmrPEosxmAapWfiKZQNWi?usp=sharing"
-    print("Downloading model...")
-    gdown.download(url, model_path, quiet=False)
-    print("Download complete.")
-
-
+for filename, file_id in files_to_download.items():
+    path = f"models/{filename}"
+    if not os.path.exists(path):
+        url = f"https://drive.google.com/uc?id={file_id}"
+        print(f"Downloading {filename}...")
+        gdown.download(url, path, quiet=False)
+        print(f"{filename} downloaded.")
+        
 combined_data = pickle.load(open("models/combined_data.pkl", "rb"))
 vectorizer = pickle.load(open("models/vectorizer.pkl", "rb"))
 genre_vectorizer = dill.load(open("models/genre_vectorizer.pkl", "rb")) 
