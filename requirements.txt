@@ -4,6 +4,7 @@ numpy
 scikit-learn
 scipy
 nltk
+dill
 spacy
 faiss-cpu
 openpyxl

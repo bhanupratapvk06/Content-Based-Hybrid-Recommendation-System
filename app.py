@@ -1,9 +1,11 @@
 import dill
 import faiss
 import pickle
+import numpy as np
 import pandas as pd
 from scipy import sparse
 from scipy.sparse import hstack
+from sklearn.metrics.pairwise import cosine_similarity
 import streamlit as st
 
 # -------------------------------
@@ -11,7 +13,8 @@ import streamlit as st
 # -------------------------------
 combined_data = pickle.load(open("models/combined_data.pkl", "rb"))
 vectorizer = pickle.load(open("models/vectorizer.pkl", "rb"))
-genre_vectorizer = dill.load(open("models/genre_vectorizer.pkl", "rb"))
+genre_vectorizer = dill.load(open("models/genre_vectorizer.pkl", "rb")) 
+reduced_matrix = dill.load(open("models/reduced_matrix.pkl", "rb")) 
 svd = pickle.load(open("models/svd.pkl", "rb"))
 index = faiss.read_index("models/faiss.index")
 
@@ -29,7 +32,30 @@ def build_feature_vector(idx, combined_data, genre_vectorizer, vectorizer):
     r_vec = sparse.csr_matrix([[combined_data.loc[idx, "rating"]]])
     return hstack([g_vec, d_vec, r_vec])
 
-def find_cross_recommendations(title, n=10):
+def maximal_marginal_relevance(query_vec, candidate_vecs, candidate_indices, top_n=10, diversity=0.5):
+    sim_to_query = cosine_similarity(candidate_vecs, query_vec.reshape(1, -1))
+    
+    sim_between = cosine_similarity(candidate_vecs)
+    
+    selected = []
+    while len(selected) < top_n and len(selected) < len(candidate_indices):
+        if not selected:
+            idx = np.argmax(sim_to_query)
+            selected.append(idx)
+        else:
+            remaining = list(set(range(len(candidate_indices))) - set(selected))
+            mmr_scores = []
+            for i in remaining:
+                relevance = sim_to_query[i]
+                diversity_penalty = max(sim_between[i][j] for j in selected)
+                mmr_score = diversity * relevance - (1 - diversity) * diversity_penalty
+                mmr_scores.append(mmr_score)
+            idx = remaining[np.argmax(mmr_scores)]
+            selected.append(idx)
+    
+    return [candidate_indices[i] for i in selected]
+
+def find_cross_recommendations(title, n=20,diversity=0.6):
     found = combined_data[combined_data['title'].str.contains(title, case=False, regex=False)]
     if found.empty:
         return f"No matches for '{title}'"
@@ -37,31 +63,31 @@ def find_cross_recommendations(title, n=10):
     idx = found.index[0]
     input_type = combined_data.loc[idx, 'type']
     target_type = 'movie' if input_type == 'anime' else 'anime'
+    vec = reduced_matrix[idx].reshape(1, -1)
+
+    distances, indices = index.search(vec, 50)
     
-    vec = build_feature_vector(idx, combined_data, genre_vectorizer, vectorizer)
-    vec_reduced = svd.transform(vec).astype("float32")
+    candidate_indices = [i for i in indices[0][1:] if combined_data.loc[i, 'type'] == target_type]
+    candidate_vecs = reduced_matrix[candidate_indices]
     
-    distances, indices = index.search(vec_reduced, len(combined_data))
-    
+    diverse_indices = maximal_marginal_relevance(vec, candidate_vecs, candidate_indices, top_n=n, diversity=diversity)
+
     recs = []
-    for i, rec_idx in enumerate(indices[0]):
-        if combined_data.loc[rec_idx, 'type'] != target_type:
-            continue
-        
+    for rec_idx in diverse_indices:
         shared_genres = get_shared_genres(idx, rec_idx)
         explanation = ""
         if shared_genres:
             explanation += f"Shares themes: {', '.join(shared_genres)}. "
         if abs(combined_data.loc[idx, 'rating'] - combined_data.loc[rec_idx, 'rating']) < 0.5:
             explanation += "Similar audience rating. "
-        
+
         recs.append({
             "title": combined_data.loc[rec_idx, "title"],
             "rating": combined_data.loc[rec_idx, "rating"],
             "description": combined_data.loc[rec_idx, "description"],
             "genres": combined_data.loc[rec_idx, "genres"],
             "image": combined_data.loc[rec_idx, "img_url"],
-            "similarity": float(distances[0][i]),
+            "similarity": float(cosine_similarity(vec, reduced_matrix[rec_idx].reshape(1, -1))[0][0]),
             "explanation": explanation.strip()
         })
         if len(recs) >= n:
@@ -159,15 +185,19 @@ if st.button("✨ Recommend"):
                                 ])
                             
                             st.markdown(f"""
-                                <div class="recommendation-card" style="display:flex; align-items:flex-start; gap:20px; min-height:250px; padding:15px; border:1px solid #eee; border-radius:10px;">
+                                <div class="recommendation-card" style="display:flex; align-items:flex-start; gap:20px;">
                                     <div style="flex-shrink:0; width:200px; height:250px; overflow:hidden; border-radius:8px;">
                                         <img src="{image_url}" style="width:100%; height:100%; object-fit:cover;">
                                     </div>
                                     <div style="flex-grow:1; text-align:left;">
-                                        <h4 class="highlight" style="margin-top:10px;">{row['title']} <span style = "color:#1f6feb">--- Similarity: ({row['similarity']:.2f})</span></h3>
+                                        <h4 class="highlight" style="margin-top:10px;">
+                                            {row['title']} 
+                                            <span style="color:#1f6feb">— Similarity: {row['similarity']:.2f}</span>
+                                        </h4>
                                         <p>⭐ <strong>{row['rating']}</strong></p>
                                         <p>{genre_html}</p>
-                                        <p> {row['description']}</p>
+                                        <p>{row['description']}</p>
                                     </div>
                                 </div>
                             """, unsafe_allow_html=True)
+

@@ -1,128 +1,122 @@
-# 🎬 Anime & Movie Hybrid Recommendation System
+# 🎬 Anime & Movie Recommendation System
 
-A **content-based hybrid recommendation system** that suggests **similar movies for a given anime** and **similar anime for a given movie**.  
-The system uses **TF-IDF, genre embeddings, ratings, dimensionality reduction (SVD), and FAISS indexing** for efficient similarity search, and is wrapped in an interactive **Streamlit web app**.
+A **content-based recommendation system** that suggests similar anime
+and movies using genres, plot descriptions, and ratings.\
+It leverages **TF-IDF**, **FAISS (Facebook AI Similarity Search)**, and
+**dimensionality reduction (TruncatedSVD)** for efficient similarity
+search, with an interactive **Streamlit UI** for exploration.
 
----
+------------------------------------------------------------------------
 
-## ✨ Features
-- Cross-domain recommendations (Anime ↔ Movies)
-- Content-based hybrid features:
-  - Genres (bag-of-words)
-  - Descriptions (TF-IDF)
-  - Ratings (normalized)
-- Dimensionality reduction with **Truncated SVD**
-- Fast similarity search using **FAISS**
-- Clean and modern **Streamlit UI** with explanations:
-  - Shared genres
-  - Similar audience rating
-- Image previews for recommendations
+## 📌 Features
 
----
+-   Hybrid feature engineering with **genres**, **descriptions**, and
+    **ratings**.\
+-   **Content preprocessing** with tokenization, lemmatization, and
+    stopword removal.\
+-   **Dimensionality reduction** using TruncatedSVD for efficient
+    similarity search.\
+-   **FAISS-based nearest neighbor search** for fast recommendations.\
+-   **Maximal Marginal Relevance (MMR)** for diverse recommendation
+    results.\
+-   User-friendly **Streamlit web interface** with recommendation
+    explanations (shared genres, similar ratings, etc.).
 
-## 🛠 Tech Stack
-- **Python** (pandas, numpy, scikit-learn, scipy)
-- **Natural Language Processing**: NLTK, TF-IDF
-- **Dimensionality Reduction**: TruncatedSVD
-- **Similarity Search**: FAISS
-- **Web App**: Streamlit
-- **Persistence**: dill, pickle
+------------------------------------------------------------------------
 
----
+## 🛠 Project Structure
 
-## 📂 Project Structure
-```
-├── Data/                        # Raw datasets
-│   ├── anime-dataset-2023.csv
-│   └── TMDB_movie_dataset_v11.csv
-│
-├── models/                      # Saved preprocessing + FAISS index
-│   ├── combined_data.pkl
-│   ├── vectorizer.pkl
-│   ├── genre_vectorizer.pkl
-│   ├── svd.pkl
-│   └── faiss.index
-│
-├── preprocess_and_build.py       # Preprocess datasets & build FAISS index
-├── app.py                        # Streamlit web app for recommendations
-├── requirements.txt              # Python dependencies
-└── README.md
-```
+    ├── app.py
+    ├── preprocess_and_build.py
+    ├── Data/
+    │   ├── anime-dataset-2023.csv
+    │   ├── TMDB_movie_dataset_v11.csv
+    ├── models/
+    │   ├── combined_data.pkl
+    │   ├── vectorizer.pkl
+    │   ├── genre_vectorizer.pkl
+    │   ├── reduced_matrix.pkl
+    │   ├── svd.pkl
+    │   ├── faiss.index
 
----
+------------------------------------------------------------------------
 
-## ⚙️ Installation & Setup
+## ⚙️ Installation
 
-### 1. Clone the repository
-```bash
-git clone https://github.com/yourusername/anime-movie-recommender.git
-cd anime-movie-recommender
-```
+1.  Clone the repository:
 
-### 2. Create virtual environment (recommended)
-```bash
-python -m venv venv
-source venv/bin/activate   # Mac/Linux
-venv\Scripts\activate      # Windows
-```
+    ``` bash
+    git clone https://github.com/bhanupratapvk06/Content-Based-Hybrid-Recommendation-System.git
+    cd anime-movie-recommender
+    ```
 
-### 3. Install dependencies
-```bash
-pip install -r requirements.txt
-```
+2.  Create a virtual environment & install dependencies:
 
-### 4. Download NLTK resources
-The preprocessing script requires **stopwords** and **WordNet lemmatizer**:
-```python
-import nltk
-nltk.download('stopwords')
-nltk.download('wordnet')
-```
+    ``` bash
+    python -m venv venv
+    source venv/bin/activate
+    venv\Scripts\activate
+    pip install -r requirements.txt
+    ```
 
----
+3.  Download datasets and place them under the `Data/` directory:
+
+    -   `anime-dataset-2023.csv`\
+    -   `TMDB_movie_dataset_v11.csv`
+
+------------------------------------------------------------------------
 
 ## 🚀 Usage
 
-### Step 1: Preprocess and build index
-Run this once to generate `models/` artifacts.
-```bash
+### Step 1: Preprocess data and build models
+
+This script cleans the datasets, vectorizes features, builds FAISS
+index, and saves models into the `models/` folder.
+
+``` bash
 python preprocess_and_build.py
 ```
 
-### Step 2: Launch the app
-```bash
+### Step 2: Run the Streamlit app
+
+``` bash
 streamlit run app.py
 ```
 
-### Step 3: Open in browser
-Navigate to:
-```
-http://localhost:8501
-```
+Then, open the local URL (usually `http://localhost:8501/`) in your
+browser.
 
-Enter a movie or anime title to get **cross-recommendations** 🎉
-
----
+------------------------------------------------------------------------
 
 ## 📊 Example
-- Input: *Your Name* (Anime)
-- Output: Recommendations of **movies** with similar genres/themes/ratings.  
 
----
+1.  Enter an anime or movie title (e.g., *Your Name*).\
+2.  The system finds **cross-domain recommendations** (anime → movies or
+    movies → anime).\
+3.  Results include similarity score, genres, ratings, and short
+    explanations.
 
-## 🔮 Future Improvements
-- Add collaborative filtering to enrich hybrid model
-- Improve genre extraction with embeddings
-- Deploy on **Streamlit Cloud / Hugging Face Spaces**
-- Add user history & personalization
+------------------------------------------------------------------------
 
----
+## 📦 Requirements
 
-## 🤝 Contributing
-Contributions are welcome!  
-Feel free to fork, submit issues, or open a pull request.
+-   Python 3.8+\
+-   pandas, numpy, scipy\
+-   scikit-learn\
+-   nltk\
+-   faiss\
+-   dill\
+-   streamlit
 
----
+Install all with:
+
+``` bash
+pip install -r requirements.txt
+```
+
+------------------------------------------------------------------------
 
 ## 📜 License
-MIT License © 2025 Bhanu Pratap Singh
+
+This project is licensed under the MIT License -- feel free to use and
+modify.

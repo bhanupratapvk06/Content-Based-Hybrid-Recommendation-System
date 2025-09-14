@@ -102,7 +102,15 @@ description_matrix = vectorizer.fit_transform(combined_data['cleaned_description
 rating_scaled = MinMaxScaler().fit_transform(combined_data[['rating']])
 rating_sparse = sparse.csr_matrix(rating_scaled)
 
-combined_matrix = hstack([genre_matrix, description_matrix, rating_sparse])
+genre_weight = 1.5   
+description_weight = 3
+rating_weight = 0.7
+combined_matrix = hstack([
+    genre_matrix * genre_weight,
+    description_matrix * description_weight,
+    rating_sparse * rating_weight
+])
+
 
 # -------------------------------
 # Dimensionality Reduction
@@ -120,6 +128,7 @@ index = faiss.IndexIVFFlat(quantizer, d, 100, faiss.METRIC_INNER_PRODUCT)
 index.train(reduced_matrix[:10000])
 index.add(reduced_matrix)
 
+
 # -------------------------------
 # Save objects
 # -------------------------------
@@ -131,6 +140,8 @@ with open("models/svd.pkl", "wb") as f:
     pickle.dump(svd, f)
 with open("models/genre_vectorizer.pkl", "wb") as f:
     dill.dump(genre_vectorizer, f)
+with open("models/reduced_matrix.pkl", "wb") as f:
+    dill.dump(reduced_matrix, f)
 faiss.write_index(index, "models/faiss.index")
 
 print("Preprocessing complete. Files saved in /models/")
