@@ -1,6 +1,6 @@
 import os
-import gdown
 import dill
+import gdown
 import faiss
 import pickle
 import numpy as np
