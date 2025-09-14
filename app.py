@@ -17,7 +17,7 @@ import streamlit as st
 
 model_path = "model.pkl"
 if not os.path.exists(model_path):
-    url = "https://drive.google.com/uc?id=YOUR_FILE_ID"
+    url = "https://drive.google.com/drive/folders/1NYqJKpY31jWPmrPEosxmAapWfiKZQNWi?usp=sharing"
     print("Downloading model...")
     gdown.download(url, model_path, quiet=False)
     print("Download complete.")
