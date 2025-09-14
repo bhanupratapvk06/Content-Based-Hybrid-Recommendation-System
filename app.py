@@ -58,6 +58,7 @@ with open(os.path.join(MODEL_DIR, "genre_vectorizer.pkl"), "rb") as f:
 
 with open(os.path.join(MODEL_DIR, "reduced_matrix.pkl"), "rb") as f:
     reduced_matrix = dill.load(f)
+    reduced_matrix = reduced_matrix.astype('float32')
 
 with open(os.path.join(MODEL_DIR, "svd.pkl"), "rb") as f:
     svd = pickle.load(f)
@@ -112,7 +113,8 @@ def maximal_marginal_relevance(query_vec, candidate_vecs, candidate_indices, top
     
     return [candidate_indices[i] for i in selected]
 
-def find_cross_recommendations(title, n=20,diversity=0.6):
+
+def find_cross_recommendations(title, n=20, diversity=0.6):
     found = combined_data[combined_data['title'].str.contains(title, case=False, regex=False)]
     if found.empty:
         return f"No matches for '{title}'"
@@ -120,14 +122,23 @@ def find_cross_recommendations(title, n=20,diversity=0.6):
     idx = found.index[0]
     input_type = combined_data.loc[idx, 'type']
     target_type = 'movie' if input_type == 'anime' else 'anime'
-    vec = reduced_matrix[idx].reshape(1, -1)
+    
+
+    vec = reduced_matrix[idx].reshape(1, -1).astype('float32')
+    
 
     distances, indices = index.search(vec, 50)
     
+
     candidate_indices = [i for i in indices[0][1:] if combined_data.loc[i, 'type'] == target_type]
-    candidate_vecs = reduced_matrix[candidate_indices]
+    if not candidate_indices:
+        return f"No recommendations found for '{title}' in target type '{target_type}'"
     
+    candidate_vecs = reduced_matrix[candidate_indices].astype('float32')
+    
+
     diverse_indices = maximal_marginal_relevance(vec, candidate_vecs, candidate_indices, top_n=n, diversity=diversity)
+    
 
     recs = []
     for rec_idx in diverse_indices:
@@ -137,14 +148,14 @@ def find_cross_recommendations(title, n=20,diversity=0.6):
             explanation += f"Shares themes: {', '.join(shared_genres)}. "
         if abs(combined_data.loc[idx, 'rating'] - combined_data.loc[rec_idx, 'rating']) < 0.5:
             explanation += "Similar audience rating. "
-
+        
         recs.append({
             "title": combined_data.loc[rec_idx, "title"],
             "rating": combined_data.loc[rec_idx, "rating"],
             "description": combined_data.loc[rec_idx, "description"],
             "genres": combined_data.loc[rec_idx, "genres"],
             "image": combined_data.loc[rec_idx, "img_url"],
-            "similarity": float(cosine_similarity(vec, reduced_matrix[rec_idx].reshape(1, -1))[0][0]),
+            "similarity": float(cosine_similarity(vec, reduced_matrix[rec_idx].reshape(1, -1).astype('float32'))[0][0]),
             "explanation": explanation.strip()
         })
         if len(recs) >= n:
